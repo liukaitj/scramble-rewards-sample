@@ -64,7 +64,7 @@ if data then
   end
   
   if #packKeys ~= 0 then
-    ngx.say(packKey, " already been consumed.")
+    ngx.say(packKey[1], " already been consumed.")
     local zremResult1, err = red:zrem("pack", packKey[1])
     if not zremResult1 then
       ngx.say("failed to zrem1: ", err)
