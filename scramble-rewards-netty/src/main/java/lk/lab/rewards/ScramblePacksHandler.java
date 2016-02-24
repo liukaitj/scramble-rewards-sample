@@ -17,10 +17,12 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.CharsetUtil;
 import lk.lab.rewards.redis.JedisHelper;
+import redis.clients.jedis.Jedis;
 
 public class ScramblePacksHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
 	
 	private static JsonParser jsonParser = new JsonParser();
+	private Jedis jedis;
 
 	@Override
 	protected void channelRead0(ChannelHandlerContext ctx, FullHttpRequest request)
@@ -43,11 +45,12 @@ public class ScramblePacksHandler extends SimpleChannelInboundHandler<FullHttpRe
 		String user = jsonParser.parse(reqJson)
 				.getAsJsonObject().get("user").getAsString();
 		
+		jedis = getJedis();
+		
 		try {
 			// 获取user是否已领取
-			Set<String> userKeys = JedisHelper.keys(user + ":*");
+			Set<String> userKeys = JedisHelper.keys(jedis, user + ":*");
 			if (userKeys.size() != 0) {
-//				System.out.println(user + " already got a pack.");
 				FullHttpResponse response = buildResponse(
 						user + " already got a pack.", HttpResponseStatus.OK);
 				ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
@@ -55,9 +58,8 @@ public class ScramblePacksHandler extends SimpleChannelInboundHandler<FullHttpRe
 			}
 
 			// 获取一个红包ID
-			Set<String> packKey = JedisHelper.zrange("pack", 0, 0);
+			Set<String> packKey = JedisHelper.zrange(jedis, "pack", 0, 0);
 			if (packKey.size() == 0) {
-//				System.out.println("all packs have been scrambled out.");
 				FullHttpResponse response = buildResponse(
 						"all packs have been scrambled out.", HttpResponseStatus.OK);
 				ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
@@ -66,10 +68,9 @@ public class ScramblePacksHandler extends SimpleChannelInboundHandler<FullHttpRe
 
 			// 检查是否已被领取
 			String pack = packKey.toArray(new String[packKey.size()])[0];
-			Set<String> packKeys = JedisHelper.keys("*:" + pack);
+			Set<String> packKeys = JedisHelper.keys(jedis, "*:" + pack);
 			if (packKeys.size() != 0) {
-//				System.out.println(pack + " already been consumed.");
-				JedisHelper.zrem("pack", pack);
+				JedisHelper.zrem(jedis, "pack", pack);
 				FullHttpResponse response = buildResponse(
 						pack + " already been consumed.", HttpResponseStatus.OK);
 				ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
@@ -77,26 +78,32 @@ public class ScramblePacksHandler extends SimpleChannelInboundHandler<FullHttpRe
 			}
 
 			// 领取红包
-			long remCnt = JedisHelper.zrem("pack", pack);
+			long remCnt = JedisHelper.zrem(jedis, "pack", pack);
 			if (remCnt == 0L) {
-//				System.out.println(pack + " already been consumed...");
 				FullHttpResponse response = buildResponse(
 						pack + " already been consumed...", HttpResponseStatus.OK);
 				ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 				return;
 			}
 			
-			JedisHelper.set(user + ":" + pack,
+			JedisHelper.set(jedis, user + ":" + pack,
 					String.valueOf(System.currentTimeMillis()));
-//			System.out.println(pack + " OK!!!");
 
 			// 结束
 			FullHttpResponse response = buildResponse(user + " processed",
 					HttpResponseStatus.OK);
 			ctx.writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
 		} finally {
-//			JedisHelper.returnJedisToPool();
+			jedis.close();
 		}
+	}
+	
+	protected Jedis getJedis() {
+		if (jedis == null) {
+			return JedisHelper.getJedisFromPool();
+		}
+		
+		return jedis;
 	}
 	
 	private void sendError(ChannelHandlerContext ctx, HttpResponseStatus status) {

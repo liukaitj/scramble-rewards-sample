@@ -7,20 +7,9 @@ import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
 public class JedisHelper {
-	
+
 	private static JedisPool pool;
-	private static ThreadLocal<Jedis> jedisInThread = new ThreadLocal<Jedis>();
-	
-	public static Jedis getJedisInThread() {
-		if (jedisInThread.get() == null) {
-			Jedis jedis = getJedisFromPool();
-			jedisInThread.set(jedis);
-			return jedis;
-		}
-		
-		return jedisInThread.get();
-	}
-	
+
 	public static JedisPool getPool() {
 		if (pool == null) {
 			JedisPoolConfig config = new JedisPoolConfig();
@@ -32,62 +21,30 @@ public class JedisHelper {
 		}
 		return pool;
 	}
-	
+
 	public static Jedis getJedisFromPool() {
 		return getPool().getResource();
 	}
-	
-	public static void returnJedisToPool() {
-		Jedis jedis = getJedisInThread();
+
+	public static void returnJedisToPool(Jedis jedis) {
 		jedis.close();
 	}
-	
-	public static Set<String> keys(final String pattern) {
-		Jedis jedis = getJedisFromPool();
-		
-		try {
-			return jedis.keys(pattern);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			jedis.close();
-		}
+
+	public static Set<String> keys(Jedis jedis, final String pattern) {
+		return jedis.keys(pattern);
 	}
-	
-	public static Set<String> zrange(final String key, final long start, final long end) {
-		Jedis jedis = getJedisFromPool();
-		
-		try {
-			return jedis.zrange(key, start, end);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			jedis.close();
-		}
+
+	public static Set<String> zrange(Jedis jedis, final String key, final long start,
+			final long end) {
+		return jedis.zrange(key, start, end);
 	}
-	
-	public static Long zrem(final String key, final String... members) {
-		Jedis jedis = getJedisFromPool();
-		
-		try {
-			return jedis.zrem(key, members);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			jedis.close();
-		}
+
+	public static Long zrem(Jedis jedis, final String key, final String... members) {
+		return jedis.zrem(key, members);
 	}
-	
-	public static String set(final String key, String value) {
-		Jedis jedis = getJedisFromPool();
-		
-		try {
-			return jedis.set(key, value);
-		} catch (Exception e) {
-			throw new RuntimeException(e);
-		} finally {
-			jedis.close();
-		}
+
+	public static String set(Jedis jedis, final String key, String value) {
+		return jedis.set(key, value);
 	}
 
 }

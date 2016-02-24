@@ -80,6 +80,11 @@ if data then
     return
   end
   
+  if zremResult == 0 then
+    ngx.say(packKey[1], " already been consumed...")
+    return
+  end
+  
   local setPackResult, err = red:set(user .. ":" .. packKey[1], os.time())
   if not setPackResult then
     ngx.say("failed to setPackResult: ", err)
